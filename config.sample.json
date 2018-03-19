@@ -1,7 +1,11 @@
 {
-  "url": "https://passthepopcorn.me/torrents.php?action=advanced&freetorrent=1&grouping=0",
+  "url": "https://passthepopcorn.me/torrents.php?action=advanced&freetorrent=1&grouping=0&json=noredirect",
   "username": "",
   "password": "",
-  "useragent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/60.0.3112.113 Safari/537.36",
-  "webhook": ""
+  "passkey": "",
+  "files": {
+    "grabbed": "grabbed.json",
+    "cookies": "cookies.json"
+  },
+  "webhook": "https://discordapp.com/api/webhooks/"
 }
