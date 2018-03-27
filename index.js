@@ -5,17 +5,17 @@ const Client = require('ssh2').Client
 let request = require('request')
 
 let grabbed = { grabbed: [] }
-if (fs.existsSync(config.cache.grabbed)) {
-  try { grabbed = JSON.parse(fs.readFileSync(config.cache.grabbed)) }
+if (fs.existsSync(path.join(__dirname, config.cache.grabbed))) {
+  try { grabbed = JSON.parse(fs.readFileSync(path.join(__dirname, config.cache.grabbed))) }
   catch (e) { console.error(e) }
 }
 
-if (!fs.existsSync(config.cache.cookies)) {
-  fs.closeSync(fs.openSync(config.cache.cookies, 'w'));
+if (!fs.existsSync(path.join(__dirname, config.cache.cookies))) {
+  fs.closeSync(fs.openSync(path.join(__dirname, config.cache.cookies), 'w'));
 }
 
 const FileCookieStore = require('tough-cookie-filestore')
-const jar = request.jar(new FileCookieStore(config.cache.cookies))
+const jar = request.jar(new FileCookieStore(path.join(__dirname, config.cache.cookies)))
 
 request = request.defaults({ jar: jar })
 
@@ -126,7 +126,7 @@ function sendWebhook() {
     if (err) return console.error(err)
   })
 
-  fs.writeFileSync(config.cache.grabbed, JSON.stringify(grabbed), { flag: 'w' })
+  fs.writeFileSync(path.join(__dirname, config.cache.grabbed), JSON.stringify(grabbed), { flag: 'w' })
 }
 
 function uploadTorrents() {
