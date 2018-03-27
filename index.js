@@ -109,13 +109,11 @@ function filterGoodTorrents() {
 
 function sendWebhook() {
   if (!config.webhook) return
+  if (embeds.length === 0) return
 
   let webhook = {
-    content: `${pageData.TotalResults} torrents found. ${embeds.length} matched criteria.`
-  }
-
-  if (embeds.length > 0) {
-    webhook.embeds = embeds
+    content: `${pageData.TotalResults} torrents found. ${embeds.length} matched criteria.`,
+    embeds: embeds
   }
 
   request({
