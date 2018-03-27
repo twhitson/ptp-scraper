@@ -1,11 +1,21 @@
 {
-  "url": "https://passthepopcorn.me/torrents.php?action=advanced&freetorrent=1&grouping=0&json=noredirect",
-  "username": "",
-  "password": "",
-  "passkey": "",
-  "files": {
-    "grabbed": "grabbed.json",
-    "cookies": "cookies.json"
+  "ptp": {
+    "url": "https://passthepopcorn.me/torrents.php?action=advanced&freetorrent=1&grouping=0&json=noredirect",
+    "username": "",
+    "password": "",
+    "passkey": ""
+  },
+  "sftp": {
+    "host": "",
+    "port": 22,
+    "username": "",
+    "password": "",
+    "path": "/mnt/watch/"
+  },
+  "cache": {
+    "torrent": "tmp",
+    "grabbed": "./grabbed.json",
+    "cookies": "./cookies.json"
   },
   "webhook": "https://discordapp.com/api/webhooks/"
 }

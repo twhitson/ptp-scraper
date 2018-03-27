@@ -1,32 +1,33 @@
 const config = require('./config.json')
 const fs = require('fs')
+const path = require('path')
+const Client = require('ssh2').Client
 let request = require('request')
 
 let grabbed = { grabbed: [] }
-if (fs.existsSync(config.files.grabbed)) {
-  try { grabbed = JSON.parse(fs.readFileSync(config.files.grabbed)) }
+if (fs.existsSync(config.cache.grabbed)) {
+  try { grabbed = JSON.parse(fs.readFileSync(config.cache.grabbed)) }
   catch (e) { console.error(e) }
 }
 
-if (!fs.existsSync(config.files.cookies)) {
-  fs.closeSync(fs.openSync(config.files.cookies, 'w'));
+if (!fs.existsSync(config.cache.cookies)) {
+  fs.closeSync(fs.openSync(config.cache.cookies, 'w'));
 }
 
 const FileCookieStore = require('tough-cookie-filestore')
-const jar = request.jar(new FileCookieStore(config.files.cookies))
+const jar = request.jar(new FileCookieStore(config.cache.cookies))
 
 request = request.defaults({ jar: jar })
 
 let embeds = []
+let downloads = []
 let pageData = {}
 let retryCount = 0
 
 getPageData()
 
 function getPageData() {
-  request({
-    uri: config.url
-  }, (err, res, body) => {
+  request(config.ptp.url, (err, res, body) => {
     if (err) return console.error(err)
 
     try {
@@ -53,9 +54,9 @@ function login() {
     method: 'POST',
     uri: 'https://passthepopcorn.me/ajax.php?action=login',
     form: {
-      username: config.username,
-      password: config.password,
-      passkey: config.passkey,
+      username: config.ptp.username,
+      password: config.ptp.password,
+      passkey: config.ptp.passkey,
       keeplogged: '1',
       login: 'Login In!'
     }
@@ -78,14 +79,15 @@ function filterGoodTorrents() {
 
       const seeders = parseInt(torrent.Seeders),
         leechers = parseInt(torrent.Leechers),
-        snatched = parseInt(torrent.Snatched)
+        snatched = parseInt(torrent.Snatched),
+        permalink = `https://passthepopcorn.me/torrents.php?id=${movie.GroupId}&torrentid=${torrent.Id}`
 
       if (leechers > 10
         || (leechers > seeders && seeders > 0)) {
         embeds.push({
           title: torrent.ReleaseName,
           description: `${movie.Title} (${movie.Year})`,
-          url: 'https://passthepopcorn.me/torrents.php?id=' + movie.GroupId + '&torrentid=' + torrent.Id,
+          url: permalink,
           fields: [
             { name: 'Size', value: formatBytes(torrent.Size), inline: true },
             { name: 'Snatches', value: snatched, inline: true },
@@ -96,28 +98,85 @@ function filterGoodTorrents() {
         console.log(`Sending [${torrent.Id}] ${torrent.ReleaseName}`)
 
         grabbed.grabbed.push(torrent.Id)
+        downloads.push(torrent)
       }
     })
   })
 
   sendWebhook()
+  uploadTorrents()
 }
 
 function sendWebhook() {
-  if (embeds.length === 0) return
+  if (!config.webhook) return
+
+  let webhook = {
+    content: `${pageData.TotalResults} torrents found. ${embeds.length} matched criteria.`
+  }
+
+  if (embeds.length > 0) {
+    webhook.embeds = embeds
+  }
 
   request({
     uri: config.webhook,
     method: 'POST',
-    json: {
-      content: '',
-      embeds: embeds
-    }
+    json: webhook
   }, (err, res, body) => {
     if (err) return console.error(err)
   })
 
-  fs.writeFileSync(config.files.grabbed, JSON.stringify(grabbed), { flag: 'w' })
+  fs.writeFileSync(config.cache.grabbed, JSON.stringify(grabbed), { flag: 'w' })
+}
+
+function uploadTorrents() {
+  if (!config.sftp.host) return
+  if (downloads.length === 0) return
+
+  let conn = new Client()
+
+  conn.on('ready', () => {
+    conn.sftp((err, sftp) => {
+      if (err) throw err
+      let uploaded = 0
+
+      downloads.forEach(torrent => {
+        let link = `https://passthepopcorn.me/torrents.php?action=download&id=${torrent.Id}&authkey=${pageData.AuthKey}&torrent_pass=${config.ptp.passkey}`
+        let filename = `${torrent.ReleaseName}.torrent`
+        let dest = path.join(__dirname, config.cache.torrent, filename)
+
+        request(link)
+          .pipe(fs.createWriteStream(dest))
+          .on('close', () => {
+            let readStream = fs.createReadStream(dest)
+            let writeStream = sftp.createWriteStream(config.sftp.path + filename)
+
+            writeStream.on('close', () => {
+              console.log(`Uploaded ${filename}`)
+              uploaded++
+
+              if (uploaded === downloads.length) {
+                console.log('Closing sftp connection')
+                conn.end()
+              }
+
+              fs.unlinkSync(dest)
+            })
+
+            writeStream.on('end', () => {
+              console.log('Connection closed')
+            })
+
+            readStream.pipe(writeStream)
+          })
+      })
+    })
+  }).connect({
+    host: config.sftp.host,
+    port: config.sftp.port,
+    username: config.sftp.username,
+    password: config.sftp.password
+  })
 }
 
 function formatBytes(a, b) { if (0 == a) return "0 Bytes"; var c = 1024, d = b || 2, e = ["Bytes", "KB", "MB", "GB", "TB", "PB", "EB", "ZB", "YB"], f = Math.floor(Math.log(a) / Math.log(c)); return parseFloat((a / Math.pow(c, f)).toFixed(d)) + " " + e[f] }
