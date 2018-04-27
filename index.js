@@ -127,8 +127,12 @@ function sendWebhook() {
   fs.writeFileSync(path.join(__dirname, config.cache.grabbed), JSON.stringify(grabbed), { flag: 'w' })
 }
 
+function downloadTorrents() {
+
+}
+
 function uploadTorrents() {
-  if (!config.sftp.host) return
+  if (!config.smtp || !config.sftp.host) return
   if (downloads.length === 0) return
 
   let conn = new Client()
@@ -140,7 +144,7 @@ function uploadTorrents() {
 
       downloads.forEach(torrent => {
         let link = `https://passthepopcorn.me/torrents.php?action=download&id=${torrent.Id}&authkey=${pageData.AuthKey}&torrent_pass=${config.ptp.passkey}`
-        let filename = `${torrent.ReleaseName}.torrent`
+        let filename = `${torrent.ReleaseName.replace(/[^\w.]/g, ' ')}.torrent`
         let dest = config.cache.torrent.startsWith('/') ? config.cache.torrent : path.join(__dirname, config.cache.torrent, filename)
 
         request(link)
