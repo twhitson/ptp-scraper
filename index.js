@@ -134,7 +134,9 @@ function downloadTorrents() {
   downloads.forEach(torrent => {
     let link = `https://passthepopcorn.me/torrents.php?action=download&id=${torrent.Id}&authkey=${pageData.AuthKey}&torrent_pass=${config.ptp.passkey}`
     torrent.filename = `${torrent.ReleaseName.replace(/[^\w.]/g, ' ')}.torrent`
-    torrent.dest = config.cache.torrent.startsWith('/') ? config.cache.torrent : path.join(__dirname, config.cache.torrent, torrent.filename)
+    torrent.dest = config.cache.torrent.startsWith('/') || config.cache.torrent.startsWith('C:')
+      ? path.basename(config.cache.torrent)
+      : path.join(__dirname, config.cache.torrent, torrent.filename)
 
     request(link)
       .pipe(fs.createWriteStream(torrent.dest))
