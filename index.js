@@ -141,7 +141,7 @@ function uploadTorrents() {
       downloads.forEach(torrent => {
         let link = `https://passthepopcorn.me/torrents.php?action=download&id=${torrent.Id}&authkey=${pageData.AuthKey}&torrent_pass=${config.ptp.passkey}`
         let filename = `${torrent.ReleaseName}.torrent`
-        let dest = path.join(__dirname, config.cache.torrent, filename)
+        let dest = config.cache.torrent.startsWith('/') ? config.cache.torrent : path.join(__dirname, config.cache.torrent, filename)
 
         request(link)
           .pipe(fs.createWriteStream(dest))
