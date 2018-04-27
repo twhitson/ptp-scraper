@@ -104,7 +104,7 @@ function filterGoodTorrents() {
   })
 
   sendWebhook()
-  uploadTorrents()
+  downloadTorrents()
 }
 
 function sendWebhook() {
@@ -128,7 +128,22 @@ function sendWebhook() {
 }
 
 function downloadTorrents() {
+  if (downloads.length === 0) return
+  let downloaded = 0
 
+  downloads.forEach(torrent => {
+    let link = `https://passthepopcorn.me/torrents.php?action=download&id=${torrent.Id}&authkey=${pageData.AuthKey}&torrent_pass=${config.ptp.passkey}`
+    torrent.filename = `${torrent.ReleaseName.replace(/[^\w.]/g, ' ')}.torrent`
+    torrent.dest = config.cache.torrent.startsWith('/') ? config.cache.torrent : path.join(__dirname, config.cache.torrent, torrent.filename)
+
+    request(link)
+      .pipe(fs.createWriteStream(torrent.dest))
+      .on('close', () => {
+        if (downloaded === downloads.length) {
+          uploadTorrents()
+        }
+      })
+  })
 }
 
 function uploadTorrents() {
@@ -143,42 +158,33 @@ function uploadTorrents() {
       let uploaded = 0
 
       downloads.forEach(torrent => {
-        let link = `https://passthepopcorn.me/torrents.php?action=download&id=${torrent.Id}&authkey=${pageData.AuthKey}&torrent_pass=${config.ptp.passkey}`
-        let filename = `${torrent.ReleaseName.replace(/[^\w.]/g, ' ')}.torrent`
-        let dest = config.cache.torrent.startsWith('/') ? config.cache.torrent : path.join(__dirname, config.cache.torrent, filename)
+        let readStream = fs.createReadStream(torrent.dest)
+        let writeStream = sftp.createWriteStream(config.sftp.path + torrent.filename)
 
-        request(link)
-          .pipe(fs.createWriteStream(dest))
-          .on('close', () => {
-            let readStream = fs.createReadStream(dest)
-            let writeStream = sftp.createWriteStream(config.sftp.path + filename)
+        writeStream.on('close', () => {
+          console.log(`Uploaded ${torrent.filename}`)
+          uploaded++
 
-            writeStream.on('close', () => {
-              console.log(`Uploaded ${filename}`)
-              uploaded++
+          if (uploaded === downloads.length) {
+            console.log('Closing sftp connection')
+            conn.end()
+          }
 
-              if (uploaded === downloads.length) {
-                console.log('Closing sftp connection')
-                conn.end()
-              }
+          fs.unlinkSync(torrent.dest)
+        })
 
-              fs.unlinkSync(dest)
-            })
+        writeStream.on('end', () => {
+          console.log('Connection closed')
+        })
 
-            writeStream.on('end', () => {
-              console.log('Connection closed')
-            })
-
-            readStream.pipe(writeStream)
-          })
+        readStream.pipe(writeStream)
       })
+    }).connect({
+      host: config.sftp.host,
+      port: config.sftp.port,
+      username: config.sftp.username,
+      password: config.sftp.password
     })
-  }).connect({
-    host: config.sftp.host,
-    port: config.sftp.port,
-    username: config.sftp.username,
-    password: config.sftp.password
-  })
-}
+  }
 
 function formatBytes(a, b) { if (0 == a) return "0 Bytes"; var c = 1024, d = b || 2, e = ["Bytes", "KB", "MB", "GB", "TB", "PB", "EB", "ZB", "YB"], f = Math.floor(Math.log(a) / Math.log(c)); return parseFloat((a / Math.pow(c, f)).toFixed(d)) + " " + e[f] }
